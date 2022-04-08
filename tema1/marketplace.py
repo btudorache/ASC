@@ -5,11 +5,11 @@ Computer Systems Architecture Course
 Assignment 1
 March 2021
 """
-
-
+import time
 from threading import Lock
 from unittest import TestCase
-from product import Tea, Coffee
+
+from tema.product import Tea, Coffee
 
 
 class Marketplace:
@@ -25,6 +25,7 @@ class Marketplace:
         :param queue_size_per_producer: the maximum size of a queue associated with each producer
         """
         self.market_lock = Lock()
+        self.print_lock = Lock()
 
         self.queue_size = queue_size_per_producer
         self.producer_items_count = {}
@@ -142,6 +143,9 @@ class Marketplace:
 
                     break
 
+            if deleted_producer_id is None:
+                return False
+
             num_items, reserved_items = self.products[deleted_producer_id][product.name]
             self.products[deleted_producer_id][product.name] = num_items, reserved_items - 1
 
@@ -155,6 +159,7 @@ class Marketplace:
         :param cart_id: id cart
         """
         with self.market_lock:
+            items_bought = []
             for product_name in self.carts[cart_id]:
                 for producer_id, num_reserved in self.carts[cart_id][product_name].items():
                     num_items, reserved_items = self.products[producer_id][product_name]
@@ -162,6 +167,106 @@ class Marketplace:
                         (num_items - num_reserved, reserved_items - num_reserved)
                     self.producer_items_count[producer_id] -= num_reserved
                     for _ in range(num_reserved):
-                        print(f'{cart_id} bought {str(self.all_products[product_name])}')
+                        items_bought.append(f'{cart_id} bought {str(self.all_products[product_name])}')
 
             self.carts[cart_id] = {}
+
+            return items_bought
+
+
+class TestMarketplace(TestCase):
+    def setUp(self):
+        self.marketplace = Marketplace(2)
+        self.first_prd_id = self.marketplace.register_producer()
+        self.second_prd_id = self.marketplace.register_producer()
+
+        self.first_cart_id = self.marketplace.new_cart()
+        self.second_cart_id = self.marketplace.new_cart()
+
+        self.fake_products = {'first_tea': Tea('Green', 2, 'Good'),
+                              'second_tea': Tea('Black', 3, 'Bad'),
+                              'first_coffee': Coffee('Brazilian', 5, 'high', 'high')}
+
+    def test_register_producer(self):
+        first_producer_id = self.marketplace.register_producer()
+        self.assertEqual(first_producer_id, 'producer3')
+        self.assertEqual(self.marketplace.producer_items_count[first_producer_id], 0)
+        self.assertTrue(first_producer_id in self.marketplace.products)
+        self.assertEqual(self.marketplace.producer_id_count, 4)
+
+        second_producer_id = self.marketplace.register_producer()
+        self.assertEqual(second_producer_id, 'producer4')
+        self.assertEqual(self.marketplace.producer_id_count, 5)
+
+    def test_publish(self):
+        first_product = self.fake_products['first_tea']
+        result = self.marketplace.publish(self.first_prd_id, first_product)
+        self.assertEqual(result, True)
+        self.assertTrue(first_product.name in self.marketplace.all_products)
+        self.assertEqual(self.marketplace.products[self.first_prd_id][first_product.name], (1, 0))
+
+        result = self.marketplace.publish(self.first_prd_id, first_product)
+        self.assertEqual(result, True)
+        self.assertEqual(self.marketplace.products[self.first_prd_id][first_product.name], (2, 0))
+
+        result = self.marketplace.publish(self.first_prd_id, first_product)
+        self.assertEqual(result, False)
+
+        second_product = self.fake_products['first_coffee']
+        result = self.marketplace.publish(self.second_prd_id, second_product)
+        self.assertEqual(result, True)
+        self.assertEqual(self.marketplace.products[self.second_prd_id][second_product.name],
+                         (1, 0))
+
+    def test_new_cart(self):
+        first_cart_id = self.marketplace.new_cart()
+        self.assertEqual(first_cart_id, 'cons3')
+        self.assertTrue(first_cart_id in self.marketplace.carts)
+        self.assertEqual(self.marketplace.consumer_id_count, 4)
+
+        second_producer_id = self.marketplace.new_cart()
+        self.assertEqual(second_producer_id, 'cons4')
+        self.assertEqual(self.marketplace.consumer_id_count, 5)
+
+    def test_add_to_cart(self):
+        self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
+        found_res = self.marketplace.add_to_cart(self.first_cart_id,
+                                                 self.fake_products['first_tea'])
+        self.assertTrue(found_res)
+        self.assertEqual(self.marketplace.products[self.first_prd_id]['Green'],
+                         (1, 1))
+        self.assertTrue('Green' in self.marketplace.carts[self.first_cart_id])
+        self.assertEqual(self.marketplace.carts[self.first_cart_id]['Green'][self.first_prd_id],
+                         1)
+
+        add_again_res = self.marketplace.add_to_cart(self.first_cart_id,
+                                                     self.fake_products['first_tea'])
+        self.assertFalse(add_again_res)
+
+        self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
+        found_again = self.marketplace.add_to_cart(self.first_cart_id,
+                                                   self.fake_products['first_tea'])
+        self.assertTrue(found_again)
+        self.assertEqual(self.marketplace.products[self.first_prd_id]['Green'],
+                         (2, 2))
+        self.assertEqual(self.marketplace.carts[self.first_cart_id]['Green'][self.first_prd_id],
+                         2)
+
+    def test_remove_from_cart(self):
+        self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
+        self.marketplace.add_to_cart(self.first_cart_id, self.fake_products['first_tea'])
+
+        result = self.marketplace.remove_from_cart(self.first_cart_id, self.fake_products['first_tea'])
+        self.assertTrue(result)
+        self.assertEqual(self.marketplace.products[self.first_prd_id]['Green'],
+                         (1, 0))
+        self.assertTrue('Green' not in self.marketplace.carts[self.first_cart_id])
+
+    def test_place_order(self):
+        self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
+        self.marketplace.publish(self.first_prd_id, self.fake_products['first_coffee'])
+        self.marketplace.add_to_cart(self.first_cart_id, self.fake_products['first_tea'])
+        self.marketplace.add_to_cart(self.first_cart_id, self.fake_products['second_tea'])
+
+        items_bought = self.marketplace.place_order(self.first_cart_id)
+        self.assertTrue(str(self.fake_products['first_tea']) in items_bought[0])

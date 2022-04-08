@@ -57,4 +57,7 @@ class Consumer(Thread):
                     if quantity == 0:
                         break
 
-            self.marketplace.place_order(self.cart_id)
+            items_bought = self.marketplace.place_order(self.cart_id)
+            if len(items_bought) > 0:
+                with self.marketplace.print_lock:
+                    print('\n'.join(items_bought))
