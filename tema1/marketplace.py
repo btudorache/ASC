@@ -8,6 +8,8 @@ March 2021
 import time
 from threading import Lock
 from unittest import TestCase
+import logging
+import logging.handlers
 
 from tema.product import Tea, Coffee
 
@@ -24,6 +26,19 @@ class Marketplace:
         :type queue_size_per_producer: Int
         :param queue_size_per_producer: the maximum size of a queue associated with each producer
         """
+        # logger setup could be refactored into a method
+        self.logger = logging.getLogger('marketplace_logger')
+        self.logger.setLevel(logging.INFO)
+        rotating_handler = logging.handlers.RotatingFileHandler('marketplace.log',
+                                                                maxBytes=10000,
+                                                                backupCount=10)
+
+        formatter = logging.Formatter(fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                                      datefmt='%Y-%m-%dT%H:%M:%S')
+        formatter.converter = time.gmtime
+        rotating_handler.setFormatter(formatter)
+        self.logger.addHandler(rotating_handler)
+
         self.market_lock = Lock()
         self.print_lock = Lock()
 
@@ -42,11 +57,13 @@ class Marketplace:
         Returns an id for the producer that calls this.
         """
         with self.market_lock:
+            self.logger.info('entering register_producer')
             producer_id = f'producer{self.producer_id_count}'
             self.producer_items_count[producer_id] = 0
             self.products[producer_id] = {}
             self.producer_id_count += 1
 
+            self.logger.info('leaving register_producer')
             return producer_id
 
     def publish(self, producer_id, product):
@@ -62,7 +79,9 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again.
         """
         with self.market_lock:
+            self.logger.info(f'entering publish with args: {producer_id}, {product}')
             if self.producer_items_count[producer_id] == self.queue_size:
+                self.logger.info(f'leaving publish')
                 return False
 
             if product.name not in self.all_products:
@@ -74,6 +93,8 @@ class Marketplace:
             else:
                 num_items, reserved_items = self.products[producer_id][product.name]
                 self.products[producer_id][product.name] = num_items + 1, reserved_items
+
+            self.logger.info(f'leaving publish')
             return True
 
     def new_cart(self):
@@ -83,10 +104,12 @@ class Marketplace:
         :returns an int representing the cart_id
         """
         with self.market_lock:
+            self.logger.info('entering new_cart')
             cart_id = f'cons{self.consumer_id_count}'
             self.carts[cart_id] = {}
             self.consumer_id_count += 1
 
+            self.logger.info('leaving new_cart')
             return cart_id
 
     def add_to_cart(self, cart_id, product):
@@ -102,6 +125,7 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again
         """
         with self.market_lock:
+            self.logger.info(f'entering add_to_cart with args: {cart_id}, {product}')
             for producer_id, producer_products in self.products.items():
                 if product.name in producer_products:
                     num_items, reserved_items = producer_products[product.name]
@@ -116,8 +140,10 @@ class Marketplace:
                         else:
                             self.carts[cart_id][product.name][producer_id] += 1
 
+                        self.logger.info(f'leaving add_to_cart')
                         return True
 
+            self.logger.info(f'leaving add_to_cart')
             return False
 
     def remove_from_cart(self, cart_id, product):
@@ -131,6 +157,7 @@ class Marketplace:
         :param product: the product to remove from cart
         """
         with self.market_lock:
+            self.logger.info(f'entering remove_from_cart with args: {cart_id}, {product}')
             deleted_producer_id = None
             for producer_id in self.carts[cart_id][product.name]:
                 if self.carts[cart_id][product.name][producer_id] > 0:
@@ -144,11 +171,13 @@ class Marketplace:
                     break
 
             if deleted_producer_id is None:
+                self.logger.info(f'leaving remove_from_cart')
                 return False
 
             num_items, reserved_items = self.products[deleted_producer_id][product.name]
             self.products[deleted_producer_id][product.name] = num_items, reserved_items - 1
 
+            self.logger.info(f'leaving remove_from_cart')
             return True
 
     def place_order(self, cart_id):
@@ -159,6 +188,7 @@ class Marketplace:
         :param cart_id: id cart
         """
         with self.market_lock:
+            self.logger.info(f'entering place_order with args: {cart_id}')
             items_bought = []
             for product_name in self.carts[cart_id]:
                 for producer_id, num_reserved in self.carts[cart_id][product_name].items():
@@ -171,6 +201,7 @@ class Marketplace:
 
             self.carts[cart_id] = {}
 
+            self.logger.info(f'leaving place_order')
             return items_bought
 
 
