@@ -78,15 +78,15 @@ class Marketplace:
 
         :returns True or False. If the caller receives False, it should wait and then try again.
         """
+        self.logger.info('entering publish with args: {%s}, {%s}', producer_id, str(product))
+        if self.producer_items_count[producer_id] == self.queue_size:
+            self.logger.info('leaving publish')
+            return False
+
+        if product.name not in self.all_products:
+            self.all_products[product.name] = product
+
         with self.market_lock:
-            self.logger.info('entering publish with args: {%s}, {%s}', producer_id, str(product))
-            if self.producer_items_count[producer_id] == self.queue_size:
-                self.logger.info('leaving publish')
-                return False
-
-            if product.name not in self.all_products:
-                self.all_products[product.name] = product
-
             self.producer_items_count[producer_id] += 1
             if product.name not in self.products[producer_id]:
                 self.products[producer_id][product.name] = (1, 0)
@@ -94,8 +94,8 @@ class Marketplace:
                 num_items, reserved_items = self.products[producer_id][product.name]
                 self.products[producer_id][product.name] = num_items + 1, reserved_items
 
-            self.logger.info('leaving publish')
-            return True
+        self.logger.info('leaving publish')
+        return True
 
     def new_cart(self):
         """
@@ -124,11 +124,11 @@ class Marketplace:
 
         :returns True or False. If the caller receives False, it should wait and then try again
         """
-        with self.market_lock:
-            self.logger.info('entering add_to_cart with args: {%s}, {%s}', cart_id, str(product))
-            for producer_id, producer_products in self.products.items():
-                if product.name in producer_products:
-                    num_items, reserved_items = producer_products[product.name]
+        self.logger.info('entering add_to_cart with args: {%s}, {%s}', cart_id, str(product))
+        for producer_id, producer_products in self.products.items():
+            if product.name in producer_products:
+                num_items, reserved_items = producer_products[product.name]
+                with self.market_lock:
                     if reserved_items < num_items:
                         producer_products[product.name] = (num_items, reserved_items + 1)
 
@@ -143,8 +143,8 @@ class Marketplace:
                         self.logger.info('leaving add_to_cart')
                         return True
 
-            self.logger.info('leaving add_to_cart')
-            return False
+        self.logger.info('leaving add_to_cart')
+        return False
 
     def remove_from_cart(self, cart_id, product):
         """
@@ -156,11 +156,11 @@ class Marketplace:
         :type product: Product
         :param product: the product to remove from cart
         """
-        with self.market_lock:
-            self.logger.info('entering remove_from_cart with args: {%s}, {%s}',
-                             cart_id, str(product))
-            deleted_producer_id = None
-            for producer_id in self.carts[cart_id][product.name]:
+        self.logger.info('entering remove_from_cart with args: {%s}, {%s}',
+                         cart_id, str(product))
+        deleted_producer_id = None
+        for producer_id in self.carts[cart_id][product.name]:
+            with self.market_lock:
                 if self.carts[cart_id][product.name][producer_id] > 0:
                     deleted_producer_id = producer_id
                     self.carts[cart_id][product.name][producer_id] -= 1
@@ -171,15 +171,16 @@ class Marketplace:
 
                     break
 
-            if deleted_producer_id is None:
-                self.logger.info('leaving remove_from_cart')
-                return False
+        if deleted_producer_id is None:
+            self.logger.info('leaving remove_from_cart')
+            return False
 
+        with self.market_lock:
             num_items, reserved_items = self.products[deleted_producer_id][product.name]
             self.products[deleted_producer_id][product.name] = num_items, reserved_items - 1
 
-            self.logger.info('leaving remove_from_cart')
-            return True
+        self.logger.info('leaving remove_from_cart')
+        return True
 
     def place_order(self, cart_id):
         """
@@ -188,11 +189,11 @@ class Marketplace:
         :type cart_id: Int
         :param cart_id: id cart
         """
-        with self.market_lock:
-            self.logger.info('entering place_order with args: {%s}', cart_id)
-            items_bought = []
-            for product_name in self.carts[cart_id]:
-                for producer_id, num_reserved in self.carts[cart_id][product_name].items():
+        self.logger.info('entering place_order with args: {%s}', cart_id)
+        items_bought = []
+        for product_name in self.carts[cart_id]:
+            for producer_id, num_reserved in self.carts[cart_id][product_name].items():
+                with self.market_lock:
                     num_items, reserved_items = self.products[producer_id][product_name]
                     self.products[producer_id][product_name] = \
                         (num_items - num_reserved, reserved_items - num_reserved)
@@ -200,10 +201,10 @@ class Marketplace:
                     for _ in range(num_reserved):
                         items_bought.append(f'{cart_id} bought {self.all_products[product_name]}')
 
-            self.carts[cart_id] = {}
+        self.carts[cart_id] = {}
 
-            self.logger.info('leaving place_order')
-            return items_bought
+        self.logger.info('leaving place_order')
+        return items_bought
 
 
 class TestMarketplace(TestCase):
