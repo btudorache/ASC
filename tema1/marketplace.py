@@ -79,9 +79,9 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again.
         """
         with self.market_lock:
-            self.logger.info(f'entering publish with args: {producer_id}, {product}')
+            self.logger.info('entering publish with args: {%s}, {%s}', producer_id, str(product))
             if self.producer_items_count[producer_id] == self.queue_size:
-                self.logger.info(f'leaving publish')
+                self.logger.info('leaving publish')
                 return False
 
             if product.name not in self.all_products:
@@ -94,7 +94,7 @@ class Marketplace:
                 num_items, reserved_items = self.products[producer_id][product.name]
                 self.products[producer_id][product.name] = num_items + 1, reserved_items
 
-            self.logger.info(f'leaving publish')
+            self.logger.info('leaving publish')
             return True
 
     def new_cart(self):
@@ -125,7 +125,7 @@ class Marketplace:
         :returns True or False. If the caller receives False, it should wait and then try again
         """
         with self.market_lock:
-            self.logger.info(f'entering add_to_cart with args: {cart_id}, {product}')
+            self.logger.info('entering add_to_cart with args: {%s}, {%s}', cart_id, str(product))
             for producer_id, producer_products in self.products.items():
                 if product.name in producer_products:
                     num_items, reserved_items = producer_products[product.name]
@@ -140,10 +140,10 @@ class Marketplace:
                         else:
                             self.carts[cart_id][product.name][producer_id] += 1
 
-                        self.logger.info(f'leaving add_to_cart')
+                        self.logger.info('leaving add_to_cart')
                         return True
 
-            self.logger.info(f'leaving add_to_cart')
+            self.logger.info('leaving add_to_cart')
             return False
 
     def remove_from_cart(self, cart_id, product):
@@ -157,7 +157,8 @@ class Marketplace:
         :param product: the product to remove from cart
         """
         with self.market_lock:
-            self.logger.info(f'entering remove_from_cart with args: {cart_id}, {product}')
+            self.logger.info('entering remove_from_cart with args: {%s}, {%s}',
+                             cart_id, str(product))
             deleted_producer_id = None
             for producer_id in self.carts[cart_id][product.name]:
                 if self.carts[cart_id][product.name][producer_id] > 0:
@@ -171,13 +172,13 @@ class Marketplace:
                     break
 
             if deleted_producer_id is None:
-                self.logger.info(f'leaving remove_from_cart')
+                self.logger.info('leaving remove_from_cart')
                 return False
 
             num_items, reserved_items = self.products[deleted_producer_id][product.name]
             self.products[deleted_producer_id][product.name] = num_items, reserved_items - 1
 
-            self.logger.info(f'leaving remove_from_cart')
+            self.logger.info('leaving remove_from_cart')
             return True
 
     def place_order(self, cart_id):
@@ -188,7 +189,7 @@ class Marketplace:
         :param cart_id: id cart
         """
         with self.market_lock:
-            self.logger.info(f'entering place_order with args: {cart_id}')
+            self.logger.info('entering place_order with args: {%s}', cart_id)
             items_bought = []
             for product_name in self.carts[cart_id]:
                 for producer_id, num_reserved in self.carts[cart_id][product_name].items():
@@ -197,16 +198,22 @@ class Marketplace:
                         (num_items - num_reserved, reserved_items - num_reserved)
                     self.producer_items_count[producer_id] -= num_reserved
                     for _ in range(num_reserved):
-                        items_bought.append(f'{cart_id} bought {str(self.all_products[product_name])}')
+                        items_bought.append(f'{cart_id} bought {self.all_products[product_name]}')
 
             self.carts[cart_id] = {}
 
-            self.logger.info(f'leaving place_order')
+            self.logger.info('leaving place_order')
             return items_bought
 
 
 class TestMarketplace(TestCase):
+    """
+    Class used for testing the Marketplace module.
+    """
     def setUp(self):
+        """
+        Tests set up method
+        """
         self.marketplace = Marketplace(2)
         self.first_prd_id = self.marketplace.register_producer()
         self.second_prd_id = self.marketplace.register_producer()
@@ -219,6 +226,9 @@ class TestMarketplace(TestCase):
                               'first_coffee': Coffee('Brazilian', 5, 'high', 'high')}
 
     def test_register_producer(self):
+        """
+        register_producer test method
+        """
         first_producer_id = self.marketplace.register_producer()
         self.assertEqual(first_producer_id, 'producer3')
         self.assertEqual(self.marketplace.producer_items_count[first_producer_id], 0)
@@ -230,6 +240,9 @@ class TestMarketplace(TestCase):
         self.assertEqual(self.marketplace.producer_id_count, 5)
 
     def test_publish(self):
+        """
+        publish test method
+        """
         first_product = self.fake_products['first_tea']
         result = self.marketplace.publish(self.first_prd_id, first_product)
         self.assertEqual(result, True)
@@ -250,6 +263,9 @@ class TestMarketplace(TestCase):
                          (1, 0))
 
     def test_new_cart(self):
+        """
+        new_cart test method
+        """
         first_cart_id = self.marketplace.new_cart()
         self.assertEqual(first_cart_id, 'cons3')
         self.assertTrue(first_cart_id in self.marketplace.carts)
@@ -260,6 +276,9 @@ class TestMarketplace(TestCase):
         self.assertEqual(self.marketplace.consumer_id_count, 5)
 
     def test_add_to_cart(self):
+        """
+        add_to_cart test method
+        """
         self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
         found_res = self.marketplace.add_to_cart(self.first_cart_id,
                                                  self.fake_products['first_tea'])
@@ -284,16 +303,23 @@ class TestMarketplace(TestCase):
                          2)
 
     def test_remove_from_cart(self):
+        """
+        remove_from_cart test method
+        """
         self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
         self.marketplace.add_to_cart(self.first_cart_id, self.fake_products['first_tea'])
 
-        result = self.marketplace.remove_from_cart(self.first_cart_id, self.fake_products['first_tea'])
+        result = self.marketplace.remove_from_cart(self.first_cart_id,
+                                                   self.fake_products['first_tea'])
         self.assertTrue(result)
         self.assertEqual(self.marketplace.products[self.first_prd_id]['Green'],
                          (1, 0))
         self.assertTrue('Green' not in self.marketplace.carts[self.first_cart_id])
 
     def test_place_order(self):
+        """
+        place_order test method
+        """
         self.marketplace.publish(self.first_prd_id, self.fake_products['first_tea'])
         self.marketplace.publish(self.first_prd_id, self.fake_products['first_coffee'])
         self.marketplace.add_to_cart(self.first_cart_id, self.fake_products['first_tea'])
