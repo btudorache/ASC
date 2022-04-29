@@ -22,36 +22,32 @@ extern inline void transpose_matrix(register int N, register double* transposed,
 
 extern inline void multiply_matrix_with_transposed(register int N, register double* res, register double* A, register double* B) {
     for (int i = 0; i < N; i++) {
-        double *orig_pa = &A[i * N];
-        double *orig_pc = &res[i * N];
-        double *orig_pb = &B[0];
+        double *outer_a = &A[i * N];
+        double *outer_res = &res[i * N];
+        double *outer_b = &B[0];
         for (int k = 0; k < N; k++) {
-            double *pb = orig_pb;
-            double *pc = orig_pc;
+            double *inner_b = outer_b;
+            double *inner_res = outer_res;
             register double tmp_elem = A[i * N + k];
             for (int j = 0; j <= i; j += 4) {
-                // res[i * N + j] += tmp_elem * B[k * N + j];
-                // res[i * N + j + 1] += tmp_elem * B[k * N + j + 1];
-                // res[i * N + j + 2] += tmp_elem * B[k * N + j + 2];
-                // res[i * N + j + 3] += tmp_elem * B[k * N + j + 3];
-                *pc += tmp_elem * *pb;
-                pc++;
-                pb++;
+                *inner_res += tmp_elem * *inner_b;
+                inner_res++;
+                inner_b++;
 
-                *pc += tmp_elem * *pb;
-                pc++;
-                pb++;
+                *inner_res += tmp_elem * *inner_b;
+                inner_res++;
+                inner_b++;
+                
+                *inner_res += tmp_elem * *inner_b;
+                inner_res++;
+                inner_b++;
 
-                *pc += tmp_elem * *pb;
-                pc++;
-                pb++;
-
-                *pc += tmp_elem * *pb;
-                pc++;
-                pb++;
+                *inner_res += tmp_elem * *inner_b;
+                inner_res++;
+                inner_b++;
             }
-            orig_pa++;
-            orig_pb += N;
+            outer_a++;
+            outer_b += N;
         }
     }
 
