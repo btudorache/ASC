@@ -7,7 +7,7 @@
 /*
  * Add your optimized implementation here
  */
-extern inline void transpose_matrix(int N, double* transposed, double *A) {
+extern inline void transpose_matrix(register int N, register double* transposed, register double *A) {
 	for (int i = 0; i < N; i++) {
         double *src = &A[i * N];
         double *dst = &transposed[i];
@@ -20,16 +20,38 @@ extern inline void transpose_matrix(int N, double* transposed, double *A) {
 }
 
 
-extern inline void multiply_matrix_with_transposed(int N, double* res, double* A, double* B) {
+extern inline void multiply_matrix_with_transposed(register int N, register double* res, register double* A, register double* B) {
     for (int i = 0; i < N; i++) {
+        double *orig_pa = &A[i * N];
+        double *orig_pc = &res[i * N];
+        double *orig_pb = &B[0];
         for (int k = 0; k < N; k++) {
+            double *pb = orig_pb;
+            double *pc = orig_pc;
             register double tmp_elem = A[i * N + k];
             for (int j = 0; j <= i; j += 4) {
-                res[i * N + j] += tmp_elem * B[k * N + j];
-                res[i * N + j + 1] += tmp_elem * B[k * N + j + 1];
-                res[i * N + j + 2] += tmp_elem * B[k * N + j + 2];
-                res[i * N + j + 3] += tmp_elem * B[k * N + j + 3];
+                // res[i * N + j] += tmp_elem * B[k * N + j];
+                // res[i * N + j + 1] += tmp_elem * B[k * N + j + 1];
+                // res[i * N + j + 2] += tmp_elem * B[k * N + j + 2];
+                // res[i * N + j + 3] += tmp_elem * B[k * N + j + 3];
+                *pc += tmp_elem * *pb;
+                pc++;
+                pb++;
+
+                *pc += tmp_elem * *pb;
+                pc++;
+                pb++;
+
+                *pc += tmp_elem * *pb;
+                pc++;
+                pb++;
+
+                *pc += tmp_elem * *pb;
+                pc++;
+                pb++;
             }
+            orig_pa++;
+            orig_pb += N;
         }
     }
 
@@ -44,7 +66,7 @@ extern inline void multiply_matrix_with_transposed(int N, double* res, double* A
     }
 }
 
-extern inline void multiply_upper_triangular_matrix(int N, double* res, double* A, double* upper_triangular) {
+extern inline void multiply_upper_triangular_matrix(register int N, register double* res, register double* A, register double* upper_triangular) {
     for (int i = 0; i < N; i++) {
         for (int k = 0; k < N; k++) {
             register double tmp_elem = A[i * N + k];
@@ -55,7 +77,7 @@ extern inline void multiply_upper_triangular_matrix(int N, double* res, double* 
     }
 }
 
-extern inline void multiply_lower_triangular_matrix(int N, double* res, double* A, double* lower_triangular) {
+extern inline void multiply_lower_triangular_matrix(register int N, register double* res, register double* A, register double* lower_triangular) {
     for (int i = 0; i < N; i++) {
         for (int k = 0; k < N; k++) {
             register double tmp_elem = A[i * N + k];
@@ -66,7 +88,7 @@ extern inline void multiply_lower_triangular_matrix(int N, double* res, double* 
     }
 }
 
-extern inline void add_matrix(int N, double* dst_matrix, double* src_matrix) {
+extern inline void add_matrix(register int N, register double* dst_matrix, register double* src_matrix) {
     for (int i = 0; i < N; i++) {
         unsigned int matrix_index = i * N;
         double *src = &src_matrix[matrix_index];
@@ -79,16 +101,16 @@ extern inline void add_matrix(int N, double* dst_matrix, double* src_matrix) {
     }
 }
 
-double* my_solver(int N, double *A, double* B) {
-	double* first_part = calloc(N * N, sizeof(double));
-    double* res = calloc(N * N, sizeof(double));
-    double* transposed_A = calloc(N * N, sizeof(double));
+double* my_solver(register int N, register double *A, register double* B) {
+	register double* first_part = calloc(N * N, sizeof(double));
+    register double* res = calloc(N * N, sizeof(double));
+    register double* transposed_A = calloc(N * N, sizeof(double));
     transpose_matrix(N, transposed_A, A);
     multiply_upper_triangular_matrix(N, first_part, B, A);
     multiply_lower_triangular_matrix(N, res, first_part, transposed_A);
 
-    double* second_part = calloc(N * N, sizeof(double));
-    double* transposed_B = calloc(N * N, sizeof(double));
+    register double* second_part = calloc(N * N, sizeof(double));
+    register double* transposed_B = calloc(N * N, sizeof(double));
     transpose_matrix(N, transposed_B, B);
     multiply_matrix_with_transposed(N, second_part, transposed_B, B);
 
