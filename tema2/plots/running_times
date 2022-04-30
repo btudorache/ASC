@@ -1,0 +1,26 @@
+BLAS:
+Run=./tema2_blas: N=200: Time=0.053106
+Run=./tema2_blas: N=400: Time=0.039329
+Run=./tema2_blas: N=600: Time=0.110069
+Run=./tema2_blas: N=800: Time=0.221133
+Run=./tema2_blas: N=1000: Time=0.401054
+Run=./tema2_blas: N=1200: Time=0.672344
+Run=./tema2_blas: N=1400: Time=1.034808
+
+NEOPT:
+Run=./tema2_neopt: N=200: Time=0.081274
+Run=./tema2_neopt: N=400: Time=0.692348
+Run=./tema2_neopt: N=600: Time=2.485161
+Run=./tema2_neopt: N=800: Time=8.829019
+Run=./tema2_neopt: N=1000: Time=15.843303
+Run=./tema2_neopt: N=1200: Time=41.835934
+Run=./tema2_neopt: N=1400: Time=65.353119
+
+OPT_M:
+Run=./tema2_opt_m: N=200: Time=0.045688
+Run=./tema2_opt_m: N=400: Time=0.323544
+Run=./tema2_opt_m: N=600: Time=1.079234
+Run=./tema2_opt_m: N=800: Time=2.618396
+Run=./tema2_opt_m: N=1000: Time=5.279533
+Run=./tema2_opt_m: N=1200: Time=9.237774
+Run=./tema2_opt_m: N=1400: Time=14.089443
